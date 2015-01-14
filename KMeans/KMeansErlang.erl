@@ -106,9 +106,6 @@ kmeans_actor(DataPartition, Centroids) ->
   receive
     %%% Tell the actor to cluster its data points
     {MainActor, cluster} ->
-      % io:format("kmeans_actor (~s): cluster ~n", [pid_to_list(self())]),
-      % io:format("Centroids: ~s ~n", [io_lib:write(Centroids)]),
-
       OldCentroids = lists:map(fun(DataPoint) -> DataPoint#dataPoint.centroid end, DataPartition),
 
       NewData = lists:map(fun(DataPoint) ->
@@ -141,7 +138,6 @@ kmeans_actor(DataPartition, Centroids) ->
 
     %%% Tell the actor to calculate its new centroid suggestions
     {MainActor, get_new_centroids} ->
-      % io:format("kmeans_actor (~s): get_new_centroids ~n", [pid_to_list(self())]),
       CentroidSuggestions = lists:map(fun(X) -> #centroidSuggestion{centroid = X#centroid.name, features = empty_features(length(X#centroid.features)), count = 0} end, Centroids),
 
       MainActor ! {new_centroids_result, generate_new_centroids_suggestions(CentroidSuggestions, DataPartition)},
@@ -149,12 +145,10 @@ kmeans_actor(DataPartition, Centroids) ->
 
     %%% Update the centroids
     {MainActor, update_centroids, NewCentroids} ->
-      % io:format("kmeans_actor (~s): update_centroids ~n", [pid_to_list(self())]),
       kmeans_actor(DataPartition, NewCentroids);
 
     %%% Get the data points of the actor
     {MainActor, get_datapoints} ->
-      % io:format("kmeans_actor (~s): get_datapoints ~n", [pid_to_list(self())]),
       MainActor ! {datapoints_result, DataPartition},
       kmeans_actor(DataPartition, Centroids)
   end.
@@ -164,11 +158,8 @@ main_actor(Actors, Iteration, ChangesList, SuggestionsList, DataPointsList, Clus
   receive
     %%% Start clustering of points
     cluster ->
-      % io:format("main_actor: cluster~n"),
       case Iteration > 0 of
         true ->
-          % io:format("~s Start work by main actor(Iteration: ~s) ~n", [pid_to_list(self()), integer_to_list(Iteration)]),
-
           % Message all actors to cluster their data
           lists:map(fun(Actor) -> Actor ! {self(), cluster} end, Actors),
 
@@ -183,7 +174,6 @@ main_actor(Actors, Iteration, ChangesList, SuggestionsList, DataPointsList, Clus
 
     %%% Get clustering result
     {cluster_result, Changes} ->
-      % io:format("main_actor: cluster_result~n"),
       % Add cluster result
       NewChangesList = [Changes | ChangesList],
 
@@ -196,12 +186,9 @@ main_actor(Actors, Iteration, ChangesList, SuggestionsList, DataPointsList, Clus
           % If there are changes
           case lists:sum(NewChangesList) > 0 of
             true ->
-              % io:format("Changes in clustering: ~s ~n", [integer_to_list(lists:sum(NewChangesList))]),
-
               % Reset list of changes
               main_actor(Actors, Iteration, [], SuggestionsList, DataPointsList, ClusteringDone, StartingTimestamp);
             false ->
-              % io:format("0 changes happened - done ~n"),
               % Ask actors for data points
               lists:map(fun(A) -> A ! {self(), get_datapoints} end, Actors),
               main_actor(Actors, Iteration, [], SuggestionsList, DataPointsList, true, StartingTimestamp)
@@ -213,7 +200,6 @@ main_actor(Actors, Iteration, ChangesList, SuggestionsList, DataPointsList, Clus
 
     %%% Get new centroid suggestions
     {new_centroids_result, CentroidSuggestions} ->
-      % io:format("main_actor: new_centroids_result~n"),
       % Add centroids suggestions
       NewCentroidSuggestsList = [CentroidSuggestions | SuggestionsList],
 
@@ -224,8 +210,6 @@ main_actor(Actors, Iteration, ChangesList, SuggestionsList, DataPointsList, Clus
           FlatSuggestions = lists:flatten(NewCentroidSuggestsList),
           Grouped = dict:to_list(groupBy(fun(X) -> X#centroidSuggestion.centroid end, FlatSuggestions)),
           MappedGroupedList = lists:map(fun({Index, Suggestions}) -> #centroid{name = Index, features = sum_features(Suggestions, empty_features(length((hd(Suggestions))#centroidSuggestion.features)), 0)} end, Grouped),
-
-          % io:format("Centroids: ~s ~n", [io_lib:write(MappedGroupedList)]),
 
           % Send new centroids to all actors
           lists:map(fun(A) -> A ! {self(), update_centroids, MappedGroupedList} end, Actors),
@@ -238,7 +222,6 @@ main_actor(Actors, Iteration, ChangesList, SuggestionsList, DataPointsList, Clus
 
     %%% Get datapoints for correct percentage calculation
     {datapoints_result, DataPoints} ->
-      % io:format("main_actor: datapoints_result~n"),
       NewDataPointsList = [DataPoints | DataPointsList],
 
       case length(NewDataPointsList) == length(Actors) of
@@ -256,7 +239,6 @@ main_actor(Actors, Iteration, ChangesList, SuggestionsList, DataPointsList, Clus
 
           case ClusteringDone of
             true ->
-              %io:format("Clustering done"),
               output_timediff(erlang:now(), StartingTimestamp),
               init:stop();
             false ->
